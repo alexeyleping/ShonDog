@@ -62,9 +62,19 @@
 - `com.example.client.HttpClientException` - исключение
 - `com.example.client.impl.SimpleHttpClient` - реализация
 
+### Задание #2 - Proxy Endpoint ✅
+**Статус**: Завершено
+**Ветка**: task/02-proxy-endpoint (merged)
+**Файлы**:
+- `com.example.proxy.ProxyResource` - REST endpoint для проксирования GET запросов
+**Чему научились**:
+- Dependency Injection через `@Inject`
+- JAX-RS аннотации: `@Path`, `@GET`, `@Produces`, `@QueryParam`
+- Связали компоненты: ProxyResource использует HttpClient
+
 ---
 
 ## Текущий статус
 - **Фаза**: Разработка core компонентов
-- **Последнее задание**: #1
-- **Следующий шаг**: Задание #2 - Proxy endpoint
+- **Последнее задание**: #2
+- **Следующий шаг**: Задание #3 - Конфигурация backend серверов
