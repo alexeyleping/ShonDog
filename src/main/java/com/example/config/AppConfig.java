@@ -1,4 +1,4 @@
-package com.example.proxy;
+package com.example.config;
 
 import io.smallrye.config.ConfigMapping;
 

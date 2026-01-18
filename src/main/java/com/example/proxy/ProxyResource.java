@@ -2,6 +2,7 @@ package com.example.proxy;
 
 import com.example.client.HttpClient;
 import com.example.client.HttpClientException;
+import com.example.loadbalancer.LoadBalancer;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -13,8 +14,7 @@ public class ProxyResource {
     HttpClient httpClient;
 
     @Inject
-    AppConfig appConfig;
-
+    LoadBalancer loadBalancer;
 
     /**
      * Проксирует GET запрос
@@ -24,7 +24,7 @@ public class ProxyResource {
     @GET
     @Produces(MediaType.TEXT_PLAIN)
     public String proxyGet(@QueryParam("path") @DefaultValue("") String path) throws HttpClientException {
-        String url =  appConfig.backends().getFirst().url();
+        String url =  loadBalancer.selectServer();
         return httpClient.get(url + path);
     }
 }

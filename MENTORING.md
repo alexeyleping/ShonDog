@@ -76,7 +76,7 @@
 **Статус**: Завершено
 **Ветка**: task/03-backend-server-configuration
 **Файлы**:
-- `com.example.proxy.AppConfig` - интерфейс конфигурации с `@ConfigMapping`
+- `com.example.config.AppConfig` - интерфейс конфигурации с `@ConfigMapping`
 - Обновлён `com.example.proxy.ProxyResource` - использует URL из конфигурации
 - `application.properties` - список backend серверов
 **Чему научились**:
@@ -84,9 +84,42 @@
 - Вложенные интерфейсы для структурированных настроек
 - `@DefaultValue` для значений по умолчанию в query параметрах
 
+### Задание #4 - Балансировка нагрузки ✅
+**Статус**: Завершено
+**Ветка**: task/04-load-balancer
+**Файлы**:
+- `com.example.loadbalancer.LoadBalancer` - интерфейс балансировщика
+- `com.example.loadbalancer.impl.RoundRobinLoadBalancer` - реализация Round Robin
+- Обновлён `com.example.proxy.ProxyResource` - использует LoadBalancer
+**Чему научились**:
+- Round Robin алгоритм балансировки
+- `AtomicInteger` для потокобезопасного счётчика
+- Правильная организация пакетов: интерфейсы в корне, реализации в `impl`
+
+---
+
+## Структура пакетов
+
+```
+com.example
+├── client                  # HTTP клиент
+│   ├── HttpClient.java
+│   ├── HttpClientException.java
+│   └── impl
+│       └── SimpleHttpClient.java
+├── config                  # Конфигурация
+│   └── AppConfig.java
+├── loadbalancer            # Балансировка нагрузки
+│   ├── LoadBalancer.java
+│   └── impl
+│       └── RoundRobinLoadBalancer.java
+└── proxy                   # REST endpoints
+    └── ProxyResource.java
+```
+
 ---
 
 ## Текущий статус
 - **Фаза**: Разработка core компонентов
-- **Последнее задание**: #3
-- **Следующий шаг**: Задание #4 - Балансировка нагрузки
+- **Последнее задание**: #4
+- **Следующий шаг**: Задание #5 - Health Check
