@@ -1,14 +1,22 @@
 package com.example.config;
 
 import io.smallrye.config.ConfigMapping;
+import io.smallrye.config.WithDefault;
 
 import java.util.List;
 
 @ConfigMapping(prefix = "app")
 public interface AppConfig {
-    List<BackendConfig> backends();
+    Backends backends();
 
-    interface BackendConfig {
-        String url();
+    Health health();
+
+    interface Backends {
+        List<String> urls();
+    }
+
+    interface Health {
+        @WithDefault("/health")
+        String endpoint();
     }
 }

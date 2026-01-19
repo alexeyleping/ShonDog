@@ -96,6 +96,21 @@
 - `AtomicInteger` для потокобезопасного счётчика
 - Правильная организация пакетов: интерфейсы в корне, реализации в `impl`
 
+### Задание #5 - Health Check ✅
+**Статус**: Завершено
+**Ветка**: task/04-load-balancer
+**Файлы**:
+- `com.example.health.HealthChecker` - интерфейс проверки здоровья
+- `com.example.health.impl.SimpleHealthChecker` - реализация проверки
+- Обновлён `com.example.config.AppConfig` - добавлена конфигурация health endpoint
+- Обновлён `com.example.loadbalancer.impl.RoundRobinLoadBalancer` - использует HealthChecker
+- Обновлён `com.example.client.impl.SimpleHttpClient` - бросает исключение при не-2xx статусе
+**Чему научились**:
+- Health Check паттерн для проверки доступности серверов
+- `ConcurrentHashMap` для потокобезопасного хранения состояния
+- Try-catch для определения живых/мёртвых серверов
+- Проверка HTTP статус кода (2xx = успех)
+
 ---
 
 ## Структура пакетов
@@ -109,6 +124,10 @@ com.example
 │       └── SimpleHttpClient.java
 ├── config                  # Конфигурация
 │   └── AppConfig.java
+├── health                  # Health Check
+│   ├── HealthChecker.java
+│   └── impl
+│       └── SimpleHealthChecker.java
 ├── loadbalancer            # Балансировка нагрузки
 │   ├── LoadBalancer.java
 │   └── impl
@@ -121,5 +140,5 @@ com.example
 
 ## Текущий статус
 - **Фаза**: Разработка core компонентов
-- **Последнее задание**: #4
-- **Следующий шаг**: Задание #5 - Health Check
+- **Последнее задание**: #5
+- **Следующий шаг**: Задание #6 - Scheduled Health Check

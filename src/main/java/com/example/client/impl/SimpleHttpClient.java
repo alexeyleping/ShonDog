@@ -29,6 +29,10 @@ public class SimpleHttpClient implements HttpClient {
             throw new HttpClientException("Failed to execute GET request to " + url, e);
         }
 
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new HttpClientException("HTTP error: " + response.statusCode());
+        }
+
         return  response.body();
     }
 }
