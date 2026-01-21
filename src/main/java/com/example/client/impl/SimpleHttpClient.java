@@ -22,17 +22,59 @@ public class SimpleHttpClient implements HttpClient {
                 .build();
 
         HttpResponse<String> response = null;
-
-        try {
-            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        } catch (IOException | InterruptedException e) {
-            throw new HttpClientException("Failed to execute GET request to " + url, e);
-        }
-
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new HttpClientException("HTTP error: " + response.statusCode());
-        }
+        response = execute(request, "GET", url);
 
         return  response.body();
+    }
+
+    @Override
+    public String post(String url, String body) throws HttpClientException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+
+        HttpResponse<String> response = null;
+        response = execute(request, "POST", url);
+
+        return  response.body();
+    }
+
+    @Override
+    public String put(String url, String body) throws HttpClientException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .PUT(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+
+        HttpResponse<String> response = null;
+        response = execute(request, "PUT", url);
+
+        return  response.body();
+    }
+
+    @Override
+    public String delete(String url) throws HttpClientException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .DELETE()
+                .build();
+
+        HttpResponse<String> response = null;
+        response = execute(request, "DELETE", url);
+
+        return  response.body();
+    }
+
+    private HttpResponse<String> execute(HttpRequest request, String method, String url) throws HttpClientException {
+        try {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new HttpClientException("HTTP error: " + response.statusCode());
+            }
+            return response;
+        } catch (IOException | InterruptedException e) {
+            throw new HttpClientException("Failed to execute " + method + " request to " + url, e);
+        }
     }
 }

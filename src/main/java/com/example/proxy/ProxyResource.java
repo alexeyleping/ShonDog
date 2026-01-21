@@ -27,4 +27,25 @@ public class ProxyResource {
         String url =  loadBalancer.selectServer();
         return httpClient.get(url + path);
     }
+
+    @POST
+    @Produces(MediaType.TEXT_PLAIN)
+    public String proxyPost(@QueryParam("path") @DefaultValue("") String path, String body) throws HttpClientException {
+        String url =  loadBalancer.selectServer();
+        return httpClient.post(url + path, body);
+    }
+
+    @PUT
+    @Produces(MediaType.TEXT_PLAIN)
+    public String proxyPut(@QueryParam("path") @DefaultValue("") String path, String body) throws HttpClientException {
+        String url =  loadBalancer.selectServer();
+        return httpClient.put(url + path, body);
+    }
+
+    @DELETE
+    @Produces(MediaType.TEXT_PLAIN)
+    public String proxyDelete(@QueryParam("path") @DefaultValue("") String path) throws HttpClientException {
+        String url =  loadBalancer.selectServer();
+        return httpClient.delete(url + path);
+    }
 }
