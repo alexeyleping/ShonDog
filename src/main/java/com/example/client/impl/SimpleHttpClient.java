@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.Map;
 
 @ApplicationScoped
 public class SimpleHttpClient implements HttpClient {
@@ -14,12 +15,14 @@ public class SimpleHttpClient implements HttpClient {
     private final java.net.http.HttpClient httpClient = java.net.http.HttpClient.newHttpClient();
 
     @Override
-    public String get(String url) throws HttpClientException {
+    public String get(String url, Map<String, String> headers) throws HttpClientException {
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .GET()
-                .build();
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url));
+
+        headers.forEach(builder::header);
+
+        HttpRequest request = builder.GET().build();
 
         HttpResponse<String> response = null;
         response = execute(request, "GET", url);
@@ -28,11 +31,13 @@ public class SimpleHttpClient implements HttpClient {
     }
 
     @Override
-    public String post(String url, String body) throws HttpClientException {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .build();
+    public String post(String url, String body, Map<String, String> headers) throws HttpClientException {
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url));
+
+        headers.forEach(builder::header);
+
+        HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(body)).build();
 
         HttpResponse<String> response = null;
         response = execute(request, "POST", url);
@@ -41,11 +46,13 @@ public class SimpleHttpClient implements HttpClient {
     }
 
     @Override
-    public String put(String url, String body) throws HttpClientException {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .PUT(HttpRequest.BodyPublishers.ofString(body))
-                .build();
+    public String put(String url, String body, Map<String, String> headers) throws HttpClientException {
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url));
+
+        headers.forEach(builder::header);
+
+        HttpRequest request = builder.PUT(HttpRequest.BodyPublishers.ofString(body)).build();
 
         HttpResponse<String> response = null;
         response = execute(request, "PUT", url);
@@ -54,11 +61,13 @@ public class SimpleHttpClient implements HttpClient {
     }
 
     @Override
-    public String delete(String url) throws HttpClientException {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .DELETE()
-                .build();
+    public String delete(String url, Map<String, String> headers) throws HttpClientException {
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url));
+
+        headers.forEach(builder::header);
+
+        HttpRequest request = builder.DELETE().build();
 
         HttpResponse<String> response = null;
         response = execute(request, "DELETE", url);

@@ -38,6 +38,6 @@ public class SimpleHealthChecker implements HealthChecker {
 
     @Override
     public String checkHealth(String serverUrl) throws HttpClientException {
-        return httpClient.get(serverUrl);
+        return httpClient.get(serverUrl, Map.of());
     }
 }

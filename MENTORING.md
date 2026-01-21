@@ -142,6 +142,21 @@
 - JAX-RS аннотации `@POST`, `@PUT`, `@DELETE`
 - Рефакторинг: выделение общей логики в приватный метод
 
+### Задание #8 - Передача HTTP заголовков (Headers) ✅
+**Статус**: Завершено
+**Файлы**:
+- Обновлён `com.example.client.HttpClient` - все методы принимают `Map<String, String> headers`
+- Обновлён `com.example.client.impl.SimpleHttpClient` - передаёт заголовки через `builder::header`
+- Обновлён `com.example.proxy.ProxyResource` - получает заголовки из запроса, добавляет `X-Forwarded-For`
+- Обновлён `com.example.health.impl.SimpleHealthChecker` - передаёт пустой Map для health check
+**Чему научились**:
+- JAX-RS `@Context HttpHeaders` для получения заголовков входящего запроса
+- Vert.x `@Context HttpServerRequest` для получения IP клиента (`request.remoteAddress().host()`)
+- `MultivaluedMap` → `Map` преобразование (JAX-RS возвращает MultivaluedMap)
+- `HttpRequest.Builder::header` для добавления заголовков в исходящий запрос
+- Заголовок `X-Forwarded-For` — стандартный способ передачи оригинального IP клиента через прокси
+- Разница между `java.net.http.HttpHeaders` и `jakarta.ws.rs.core.HttpHeaders`
+
 ---
 
 ## Структура пакетов
@@ -172,5 +187,5 @@ com.example
 
 ## Текущий статус
 - **Фаза**: Разработка core компонентов
-- **Последнее задание**: #7 - Поддержка всех HTTP методов ✅
+- **Последнее задание**: #8 - Передача HTTP заголовков ✅
 - **Следующий шаг**: TBD
