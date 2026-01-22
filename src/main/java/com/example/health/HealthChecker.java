@@ -16,4 +16,9 @@ public interface HealthChecker {
      * Проверяет жив ли сервер
      */
     String checkHealth(String serverUrl) throws HttpClientException;
+
+    /**
+     * Помечает сервер как неработающий
+     */
+    void markUnhealthy(String url);
 }

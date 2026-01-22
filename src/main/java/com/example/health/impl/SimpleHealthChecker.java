@@ -40,4 +40,9 @@ public class SimpleHealthChecker implements HealthChecker {
     public String checkHealth(String serverUrl) throws HttpClientException {
         return httpClient.get(serverUrl, Map.of());
     }
+
+    @Override
+    public void markUnhealthy(String url) {
+        liveServers.put(url, false);
+    }
 }

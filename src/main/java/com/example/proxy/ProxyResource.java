@@ -2,6 +2,8 @@ package com.example.proxy;
 
 import com.example.client.HttpClient;
 import com.example.client.HttpClientException;
+import com.example.health.HealthChecker;
+import com.example.health.impl.ScheduledHealthCheckService;
 import com.example.loadbalancer.LoadBalancer;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -10,8 +12,9 @@ import jakarta.ws.rs.core.MediaType;
 
 import jakarta.ws.rs.core.HttpHeaders;
 import io.vertx.core.http.HttpServerRequest;
-import java.util.HashMap;
-import java.util.Map;
+import jakarta.ws.rs.core.Response;
+
+import java.util.*;
 
 @Path("/proxy")
 public class ProxyResource {
@@ -22,57 +25,54 @@ public class ProxyResource {
     @Inject
     LoadBalancer loadBalancer;
 
+    @Inject
+    ScheduledHealthCheckService scheduledHealthCheckService;
+
+    @Inject
+    HealthChecker healthChecker;
+
     /**
      * Проксирует GET запрос
-     * URL backend сервера (например "http://example.com/api")
-     * @return тело ответа от backend
      */
     @GET
     @Produces(MediaType.TEXT_PLAIN)
-    public String proxyGet(@QueryParam("path") @DefaultValue("") String path, @Context HttpHeaders headers,
-                           @Context HttpServerRequest request) throws HttpClientException {
-        String url = loadBalancer.selectServer();
+    public Response proxyGet(@QueryParam("path") @DefaultValue("") String path, @Context HttpHeaders headers,
+                             @Context HttpServerRequest request) {
         Map<String, String> headersMap = createHeaders(headers, request);
-        return httpClient.get(url + path, headersMap);
+        return executeWithRetry(path, headersMap, (url, h) -> httpClient.get(url, h));
     }
 
     /**
      * Проксирует POST запрос
-     * @return тело ответа от backend
      */
     @POST
     @Produces(MediaType.TEXT_PLAIN)
-    public String proxyPost(@QueryParam("path") @DefaultValue("") String path, String body, @Context HttpHeaders headers,
-                            @Context HttpServerRequest request) throws HttpClientException {
-        String url = loadBalancer.selectServer();
+    public Response proxyPost(@QueryParam("path") @DefaultValue("") String path, String body, @Context HttpHeaders headers,
+                              @Context HttpServerRequest request) {
         Map<String, String> headersMap = createHeaders(headers, request);
-        return httpClient.post(url + path, body, headersMap);
+        return executeWithRetry(path, headersMap, (url, h) -> httpClient.post(url, body, h));
     }
 
     /**
      * Проксирует PUT запрос
-     * @return тело ответа от backend
      */
     @PUT
     @Produces(MediaType.TEXT_PLAIN)
-    public String proxyPut(@QueryParam("path") @DefaultValue("") String path, String body, @Context HttpHeaders headers,
-                           @Context HttpServerRequest request) throws HttpClientException {
-        String url = loadBalancer.selectServer();
+    public Response proxyPut(@QueryParam("path") @DefaultValue("") String path, String body, @Context HttpHeaders headers,
+                             @Context HttpServerRequest request) {
         Map<String, String> headersMap = createHeaders(headers, request);
-        return httpClient.put(url + path, body, headersMap);
+        return executeWithRetry(path, headersMap, (url, h) -> httpClient.put(url, body, h));
     }
 
     /**
      * Проксирует DELETE запрос
-     * @return тело ответа от backend
      */
     @DELETE
     @Produces(MediaType.TEXT_PLAIN)
-    public String proxyDelete(@QueryParam("path") @DefaultValue("") String path, @Context HttpHeaders headers,
-                              @Context HttpServerRequest request) throws HttpClientException {
-        String url = loadBalancer.selectServer();
+    public Response proxyDelete(@QueryParam("path") @DefaultValue("") String path, @Context HttpHeaders headers,
+                                @Context HttpServerRequest request) {
         Map<String, String> headersMap = createHeaders(headers, request);
-        return httpClient.delete(url + path, headersMap);
+        return executeWithRetry(path, headersMap, (url, h) -> httpClient.delete(url, h));
     }
 
     /**
@@ -88,5 +88,64 @@ public class ProxyResource {
         });
         headersMap.put("X-Forwarded-For", request.remoteAddress().host());
         return headersMap;
+    }
+
+    /**
+     * Выполняет HTTP операцию с retry и failover
+     */
+    private Response executeWithRetry(String path, Map<String, String> headers,
+                                      HttpOperation operation) {
+        String url;
+        try {
+            url = loadBalancer.selectServer();
+        } catch (HttpClientException e) {
+            return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .entity("No available servers")
+                    .build();
+        }
+
+        Set<String> triedServers = new HashSet<>();
+        triedServers.add(url);
+
+        // Первая попытка
+        try {
+            String response = operation.execute(url + path, headers);
+            return Response.ok(response).build();
+        } catch (HttpClientException e) {
+            healthChecker.markUnhealthy(url);
+        }
+
+        // Retry на других серверах
+        int maxAttempts = scheduledHealthCheckService.getCachedHealthyServers().size();
+
+        for (int i = 0; i < maxAttempts; i++) {
+            String newUrl;
+            try {
+                newUrl = loadBalancer.selectServer();
+            } catch (HttpClientException e) {
+                break;  // Нет доступных серверов
+            }
+
+            if (triedServers.contains(newUrl)) {
+                continue;
+            }
+            triedServers.add(newUrl);
+
+            try {
+                String response = operation.execute(newUrl + path, headers);
+                return Response.ok(response).build();
+            } catch (HttpClientException ignored) {
+                healthChecker.markUnhealthy(newUrl);
+            }
+        }
+
+        return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                .entity("All backend servers are unavailable")
+                .build();
+    }
+
+    @FunctionalInterface
+    interface HttpOperation {
+        String execute(String url, Map<String, String> headers) throws HttpClientException;
     }
 }
