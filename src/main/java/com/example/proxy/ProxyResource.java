@@ -13,6 +13,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.HttpHeaders;
 import io.vertx.core.http.HttpServerRequest;
 import jakarta.ws.rs.core.Response;
+import org.jboss.logging.Logger;
 
 import java.util.*;
 
@@ -31,6 +32,8 @@ public class ProxyResource {
     @Inject
     HealthChecker healthChecker;
 
+    private static final Logger LOG = Logger.getLogger(ProxyResource.class);
+
     /**
      * Проксирует GET запрос
      */
@@ -39,7 +42,7 @@ public class ProxyResource {
     public Response proxyGet(@QueryParam("path") @DefaultValue("") String path, @Context HttpHeaders headers,
                              @Context HttpServerRequest request) {
         Map<String, String> headersMap = createHeaders(headers, request);
-        return executeWithRetry(path, headersMap, (url, h) -> httpClient.get(url, h));
+        return executeWithRetry("GET", path, headersMap, (url, h) -> httpClient.get(url, h));
     }
 
     /**
@@ -50,7 +53,7 @@ public class ProxyResource {
     public Response proxyPost(@QueryParam("path") @DefaultValue("") String path, String body, @Context HttpHeaders headers,
                               @Context HttpServerRequest request) {
         Map<String, String> headersMap = createHeaders(headers, request);
-        return executeWithRetry(path, headersMap, (url, h) -> httpClient.post(url, body, h));
+        return executeWithRetry("POST", path, headersMap, (url, h) -> httpClient.post(url, body, h));
     }
 
     /**
@@ -61,7 +64,7 @@ public class ProxyResource {
     public Response proxyPut(@QueryParam("path") @DefaultValue("") String path, String body, @Context HttpHeaders headers,
                              @Context HttpServerRequest request) {
         Map<String, String> headersMap = createHeaders(headers, request);
-        return executeWithRetry(path, headersMap, (url, h) -> httpClient.put(url, body, h));
+        return executeWithRetry("PUT", path, headersMap, (url, h) -> httpClient.put(url, body, h));
     }
 
     /**
@@ -72,7 +75,7 @@ public class ProxyResource {
     public Response proxyDelete(@QueryParam("path") @DefaultValue("") String path, @Context HttpHeaders headers,
                                 @Context HttpServerRequest request) {
         Map<String, String> headersMap = createHeaders(headers, request);
-        return executeWithRetry(path, headersMap, (url, h) -> httpClient.delete(url, h));
+        return executeWithRetry("DELETE", path, headersMap, (url, h) -> httpClient.delete(url, h));
     }
 
     /**
@@ -93,16 +96,21 @@ public class ProxyResource {
     /**
      * Выполняет HTTP операцию с retry и failover
      */
-    private Response executeWithRetry(String path, Map<String, String> headers,
+    private Response executeWithRetry(String method, String path, Map<String, String> headers,
                                       HttpOperation operation) {
+        long start = System.currentTimeMillis();
         String url;
         try {
             url = loadBalancer.selectServer();
         } catch (HttpClientException e) {
+            long duration = System.currentTimeMillis() - start;
+            LOG.errorf("<-- %s %s [FAILED: No available servers] %dms", method, path, duration);
             return Response.status(Response.Status.SERVICE_UNAVAILABLE)
                     .entity("No available servers")
                     .build();
         }
+
+        LOG.infof("--> %s %s -> %s", method, path, url);
 
         Set<String> triedServers = new HashSet<>();
         triedServers.add(url);
@@ -110,8 +118,11 @@ public class ProxyResource {
         // Первая попытка
         try {
             String response = operation.execute(url + path, headers);
+            long duration = System.currentTimeMillis() - start;
+            LOG.infof("<-- %s %s -> %s [200] %dms", method, path, url, duration);
             return Response.ok(response).build();
         } catch (HttpClientException e) {
+            LOG.warnf("    %s %s -> %s [FAILED: %s] retrying...", method, path, url, e.getMessage());
             healthChecker.markUnhealthy(url);
         }
 
@@ -123,7 +134,7 @@ public class ProxyResource {
             try {
                 newUrl = loadBalancer.selectServer();
             } catch (HttpClientException e) {
-                break;  // Нет доступных серверов
+                break;
             }
 
             if (triedServers.contains(newUrl)) {
@@ -131,14 +142,21 @@ public class ProxyResource {
             }
             triedServers.add(newUrl);
 
+            LOG.infof("--> %s %s -> %s (retry)", method, path, newUrl);
+
             try {
                 String response = operation.execute(newUrl + path, headers);
+                long duration = System.currentTimeMillis() - start;
+                LOG.infof("<-- %s %s -> %s [200] %dms", method, path, newUrl, duration);
                 return Response.ok(response).build();
-            } catch (HttpClientException ignored) {
+            } catch (HttpClientException e) {
+                LOG.warnf("    %s %s -> %s [FAILED: %s] retrying...", method, path, newUrl, e.getMessage());
                 healthChecker.markUnhealthy(newUrl);
             }
         }
 
+        long duration = System.currentTimeMillis() - start;
+        LOG.errorf("<-- %s %s [FAILED: All servers unavailable] %dms", method, path, duration);
         return Response.status(Response.Status.SERVICE_UNAVAILABLE)
                 .entity("All backend servers are unavailable")
                 .build();
