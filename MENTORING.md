@@ -157,6 +157,18 @@
 - Заголовок `X-Forwarded-For` — стандартный способ передачи оригинального IP клиента через прокси
 - Разница между `java.net.http.HttpHeaders` и `jakarta.ws.rs.core.HttpHeaders`
 
+### Задание #9 - Настройка таймаутов (Timeouts) ✅
+**Статус**: Завершено
+**Файлы**:
+- Обновлён `com.example.config.AppConfig` - добавлен интерфейс `Timeout` с `connect()` и `request()`
+- Обновлён `com.example.client.impl.SimpleHttpClient` - применяет таймауты из конфигурации
+- Обновлён `application.properties` - настройки `app.timeout.connect=5s` и `app.timeout.request=30s`
+**Чему научились**:
+- `@PostConstruct` для инициализации после Dependency Injection (field initializers выполняются ДО инъекции)
+- `HttpClient.Builder.connectTimeout()` для таймаута соединения
+- `HttpRequest.Builder.timeout()` для таймаута запроса
+- `HttpTimeoutException` наследуется от `IOException` и перехватывается общим catch блоком
+
 ---
 
 ## Структура пакетов
@@ -187,5 +199,5 @@ com.example
 
 ## Текущий статус
 - **Фаза**: Разработка core компонентов
-- **Последнее задание**: #8 - Передача HTTP заголовков ✅
+- **Последнее задание**: #9 - Настройка таймаутов ✅
 - **Следующий шаг**: TBD

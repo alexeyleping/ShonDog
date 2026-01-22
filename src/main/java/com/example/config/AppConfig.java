@@ -12,6 +12,8 @@ public interface AppConfig {
 
     Health health();
 
+    Timeout timeout();
+
     interface Backends {
         List<String> urls();
     }
@@ -22,5 +24,13 @@ public interface AppConfig {
 
         @WithDefault("10s")
         Duration interval();
+    }
+
+    interface Timeout {
+        @WithDefault("5s")
+        Duration connect();
+
+        @WithDefault("30s")
+        Duration request();
     }
 }
