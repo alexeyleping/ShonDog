@@ -2,6 +2,7 @@ package com.example.proxy;
 
 import com.example.client.HttpClient;
 import com.example.client.HttpClientException;
+import com.example.client.HttpResponse;
 import com.example.health.HealthChecker;
 import com.example.health.impl.ScheduledHealthCheckService;
 import com.example.loadbalancer.LoadBalancer;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -64,7 +66,7 @@ class ProxyResourceRetryTest {
     void testSuccessfulRequestOnFirstAttempt() throws HttpClientException {
         // Given: первый сервер отвечает успешно
         when(loadBalancer.selectServer()).thenReturn("http://server1:8080");
-        when(httpClient.get(anyString(), any())).thenReturn("Success");
+        when(httpClient.get(anyString(), any())).thenReturn(createResponse(200, "Success"));
 
         // When
         var response = proxyResource.proxyGet("", mockHeaders, mockRequest);
@@ -86,7 +88,7 @@ class ProxyResourceRetryTest {
         when(httpClient.get(eq("http://server1:8080"), any()))
                 .thenThrow(new HttpClientException("Connection refused"));
         when(httpClient.get(eq("http://server2:8080"), any()))
-                .thenReturn("Success from server2");
+                .thenReturn(createResponse(200, "Success from server2"));
 
         // When
         var response = proxyResource.proxyGet("", mockHeaders, mockRequest);
@@ -141,7 +143,7 @@ class ProxyResourceRetryTest {
         when(httpClient.get(eq("http://server1:8080"), any()))
                 .thenThrow(new HttpClientException("Connection refused"));
         when(httpClient.get(eq("http://server2:8080"), any()))
-                .thenReturn("Success from server2");
+                .thenReturn(createResponse(200, "Success from server2"));
 
         // When
         var response = proxyResource.proxyGet("", mockHeaders, mockRequest);
@@ -151,5 +153,13 @@ class ProxyResourceRetryTest {
         // server1 вызван 1 раз, не 2
         verify(httpClient, times(1)).get(eq("http://server1:8080"), any());
         verify(httpClient, times(1)).get(eq("http://server2:8080"), any());
+    }
+
+    private HttpResponse createResponse(int statusCode, String body) {
+        HttpResponse response = new HttpResponse();
+        response.setStatusCode(statusCode);
+        response.setBody(body);
+        response.setHeaders(Map.of());
+        return response;
     }
 }

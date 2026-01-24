@@ -1,6 +1,7 @@
 package com.example.health.impl;
 
 import com.example.client.HttpClientException;
+import com.example.client.HttpResponse;
 import com.example.config.AppConfig;
 import com.example.health.HealthChecker;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -37,7 +38,7 @@ public class SimpleHealthChecker implements HealthChecker {
     }
 
     @Override
-    public String checkHealth(String serverUrl) throws HttpClientException {
+    public HttpResponse checkHealth(String serverUrl) throws HttpClientException {
         return httpClient.get(serverUrl, Map.of());
     }
 

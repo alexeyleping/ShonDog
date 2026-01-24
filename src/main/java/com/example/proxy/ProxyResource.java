@@ -117,10 +117,12 @@ public class ProxyResource {
 
         // Первая попытка
         try {
-            String response = operation.execute(url + path, headers);
+            com.example.client.HttpResponse response = operation.execute(url + path, headers);
             long duration = System.currentTimeMillis() - start;
-            LOG.infof("<-- %s %s -> %s [200] %dms", method, path, url, duration);
-            return Response.ok(response).build();
+            LOG.infof("<-- %s %s -> %s [%d] %dms", method, path, url, response.getStatusCode(), duration);
+            Response.ResponseBuilder builder = Response.status(response.getStatusCode());
+            response.getHeaders().forEach(builder::header);
+            return builder.entity(response.getBody()).build();
         } catch (HttpClientException e) {
             LOG.warnf("    %s %s -> %s [FAILED: %s] retrying...", method, path, url, e.getMessage());
             healthChecker.markUnhealthy(url);
@@ -145,10 +147,12 @@ public class ProxyResource {
             LOG.infof("--> %s %s -> %s (retry)", method, path, newUrl);
 
             try {
-                String response = operation.execute(newUrl + path, headers);
+                com.example.client.HttpResponse response = operation.execute(newUrl + path, headers);
                 long duration = System.currentTimeMillis() - start;
-                LOG.infof("<-- %s %s -> %s [200] %dms", method, path, newUrl, duration);
-                return Response.ok(response).build();
+                LOG.infof("<-- %s %s -> %s [%d] %dms", method, path, newUrl, response.getStatusCode(), duration);
+                Response.ResponseBuilder builder = Response.status(response.getStatusCode());
+                response.getHeaders().forEach(builder::header);
+                return builder.entity(response.getBody()).build();
             } catch (HttpClientException e) {
                 LOG.warnf("    %s %s -> %s [FAILED: %s] retrying...", method, path, newUrl, e.getMessage());
                 healthChecker.markUnhealthy(newUrl);
@@ -164,6 +168,6 @@ public class ProxyResource {
 
     @FunctionalInterface
     interface HttpOperation {
-        String execute(String url, Map<String, String> headers) throws HttpClientException;
+        com.example.client.HttpResponse execute(String url, Map<String, String> headers) throws HttpClientException;
     }
 }

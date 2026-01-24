@@ -1,9 +1,9 @@
 package com.example.health;
 
 import com.example.client.HttpClientException;
+import com.example.client.HttpResponse;
 
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 
 public interface HealthChecker {
 
@@ -15,7 +15,7 @@ public interface HealthChecker {
     /**
      * Проверяет жив ли сервер
      */
-    String checkHealth(String serverUrl) throws HttpClientException;
+    HttpResponse checkHealth(String serverUrl) throws HttpClientException;
 
     /**
      * Помечает сервер как неработающий
