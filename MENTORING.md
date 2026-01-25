@@ -180,6 +180,37 @@
 - Единый формат логов: `--> METHOD path -> backend` (вход), `<-- METHOD path -> backend [status] time` (выход)
 - Разные уровни логирования: INFO для успеха, WARN для retry, ERROR для финальных ошибок
 
+### Задание #11 - Retry и Failover ✅
+**Статус**: Завершено
+**Файлы**:
+- Обновлён `com.example.health.HealthChecker` - добавлен метод `markUnhealthy(String url)`
+- Обновлён `com.example.health.impl.SimpleHealthChecker` - реализация `markUnhealthy()`
+- Обновлён `com.example.proxy.ProxyResource` - добавлена логика retry с failover на другие серверы
+- Добавлен `com.example.proxy.ProxyResourceRetryTest` - unit-тесты для retry логики
+- Обновлён `build.gradle.kts` - добавлена зависимость `quarkus-junit5-mockito`
+**Чему научились**:
+- Паттерн Retry с Failover — при ошибке пробуем следующий сервер
+- `@FunctionalInterface` для создания лямбда-выражений (`HttpOperation`)
+- `Set<String>` для отслеживания уже опробованных серверов (избегаем повторов)
+- `@InjectMock` для мокирования CDI бинов в Quarkus тестах
+- `Response.status()` и `Response.ok()` для построения HTTP ответов в JAX-RS
+- Разница между бросанием исключений и возвратом Response с кодом ошибки
+
+### Задание #12 - Передача заголовков и статус-кода ответа ✅
+**Статус**: Завершено
+**Файлы**:
+- Создан `com.example.client.HttpResponse` - класс для хранения статус-кода, тела и заголовков ответа
+- Обновлён `com.example.client.HttpClient` - все методы возвращают `HttpResponse` вместо `String`
+- Обновлён `com.example.client.impl.SimpleHttpClient` - создаёт `HttpResponse`, фильтрует hop-by-hop заголовки
+- Обновлён `com.example.proxy.ProxyResource` - передаёт клиенту реальный статус-код и заголовки от backend
+- Обновлён `com.example.health.HealthChecker` и `SimpleHealthChecker` - адаптированы под новый `HttpResponse`
+- Обновлён `ProxyResourceRetryTest` - тесты адаптированы под `HttpResponse`
+**Чему научились**:
+- Hop-by-hop заголовки (Connection, Keep-Alive, Transfer-Encoding и др.) — не должны передаваться через прокси
+- `java.net.http.HttpResponse.headers()` для получения заголовков ответа
+- `Response.ResponseBuilder.header()` для добавления заголовков в JAX-RS ответ
+- Прозрачное проксирование — клиент получает тот же статус-код и заголовки, что вернул backend
+
 ---
 
 ## Структура пакетов
@@ -189,6 +220,7 @@ com.example
 ├── client                  # HTTP клиент
 │   ├── HttpClient.java
 │   ├── HttpClientException.java
+│   ├── HttpResponse.java
 │   └── impl
 │       └── SimpleHttpClient.java
 ├── config                  # Конфигурация
@@ -210,5 +242,5 @@ com.example
 
 ## Текущий статус
 - **Фаза**: Разработка core компонентов
-- **Последнее задание**: #10 - Логирование запросов ✅
+- **Последнее задание**: #12 - Передача заголовков и статус-кода ответа ✅
 - **Следующий шаг**: TBD
