@@ -14,6 +14,16 @@ public interface AppConfig {
 
     Timeout timeout();
 
+    CircuitBreaker circuitBreaker();
+
+    interface CircuitBreaker {
+        @WithDefault("3")
+        int failureThreshold();
+
+        @WithDefault("30s")
+        Duration openDuration();
+    }
+
     interface Backends {
         List<String> urls();
     }

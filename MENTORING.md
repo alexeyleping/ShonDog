@@ -211,12 +211,34 @@
 - `Response.ResponseBuilder.header()` для добавления заголовков в JAX-RS ответ
 - Прозрачное проксирование — клиент получает тот же статус-код и заголовки, что вернул backend
 
+### Задание #13 - Circuit Breaker ✅
+**Статус**: Завершено
+**Файлы**:
+- Создан `com.example.circuitbreaker.CircuitBreaker` - интерфейс circuit breaker
+- Создан `com.example.circuitbreaker.CircuitState` - enum состояний (CLOSED, OPEN, HALF_OPEN)
+- Создан `com.example.circuitbreaker.impl.SimpleCircuitBreaker` - реализация с конфигурируемым threshold и timeout
+- Обновлён `com.example.config.AppConfig` - добавлена конфигурация `CircuitBreaker` с `failureThreshold` и `openDuration`
+- Обновлён `com.example.proxy.ProxyResource` - интеграция circuit breaker (isOpen, recordSuccess, recordFailure)
+- Обновлён `ProxyResourceRetryTest` - добавлен мок для CircuitBreaker
+**Чему научились**:
+- Паттерн Circuit Breaker — защита от каскадных сбоев
+- Три состояния: CLOSED (нормальная работа), OPEN (запросы блокируются), HALF_OPEN (пробная попытка)
+- `Duration.between()` для вычисления прошедшего времени
+- `ConcurrentHashMap` для хранения состояния каждого сервера
+- `@PostConstruct` для инициализации полей после DI (повторение)
+- Важность использования латинских символов в коде (кириллическая 'с' vs латинская 'c')
+
 ---
 
 ## Структура пакетов
 
 ```
 com.example
+├── circuitbreaker          # Circuit Breaker
+│   ├── CircuitBreaker.java
+│   ├── CircuitState.java
+│   └── impl
+│       └── SimpleCircuitBreaker.java
 ├── client                  # HTTP клиент
 │   ├── HttpClient.java
 │   ├── HttpClientException.java
@@ -242,5 +264,5 @@ com.example
 
 ## Текущий статус
 - **Фаза**: Разработка core компонентов
-- **Последнее задание**: #12 - Передача заголовков и статус-кода ответа ✅
+- **Последнее задание**: #13 - Circuit Breaker ✅
 - **Следующий шаг**: TBD

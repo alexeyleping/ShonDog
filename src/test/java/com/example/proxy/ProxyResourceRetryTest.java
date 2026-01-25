@@ -1,5 +1,6 @@
 package com.example.proxy;
 
+import com.example.circuitbreaker.CircuitBreaker;
 import com.example.client.HttpClient;
 import com.example.client.HttpClientException;
 import com.example.client.HttpResponse;
@@ -41,6 +42,9 @@ class ProxyResourceRetryTest {
     @InjectMock
     HealthChecker healthChecker;
 
+    @InjectMock
+    CircuitBreaker circuitBreaker;
+
     @Inject
     ProxyResource proxyResource;
 
@@ -49,7 +53,7 @@ class ProxyResourceRetryTest {
 
     @BeforeEach
     void setUp() throws HttpClientException {
-        Mockito.reset(httpClient, loadBalancer, scheduledHealthCheckService, healthChecker);
+        Mockito.reset(httpClient, loadBalancer, scheduledHealthCheckService, healthChecker, circuitBreaker);
 
         // Mock HttpHeaders
         mockHeaders = mock(HttpHeaders.class);
@@ -60,12 +64,17 @@ class ProxyResourceRetryTest {
         SocketAddress mockAddress = mock(SocketAddress.class);
         when(mockAddress.host()).thenReturn("127.0.0.1");
         when(mockRequest.remoteAddress()).thenReturn(mockAddress);
+
+        // Mock CircuitBreaker - по умолчанию circuit закрыт
+        when(circuitBreaker.isOpen(anyString())).thenReturn(false);
     }
 
     @Test
     void testSuccessfulRequestOnFirstAttempt() throws HttpClientException {
         // Given: первый сервер отвечает успешно
         when(loadBalancer.selectServer()).thenReturn("http://server1:8080");
+        when(scheduledHealthCheckService.getCachedHealthyServers())
+                .thenReturn(List.of("http://server1:8080"));
         when(httpClient.get(anyString(), any())).thenReturn(createResponse(200, "Success"));
 
         // When
@@ -138,8 +147,9 @@ class ProxyResourceRetryTest {
                 .thenReturn("http://server1:8080")  // первая попытка
                 .thenReturn("http://server1:8080")  // тот же сервер (должен пропустить)
                 .thenReturn("http://server2:8080"); // другой сервер
+        // maxAttempts должен быть >= 3 чтобы было достаточно итераций
         when(scheduledHealthCheckService.getCachedHealthyServers())
-                .thenReturn(List.of("http://server1:8080", "http://server2:8080"));
+                .thenReturn(List.of("http://server1:8080", "http://server2:8080", "http://server3:8080"));
         when(httpClient.get(eq("http://server1:8080"), any()))
                 .thenThrow(new HttpClientException("Connection refused"));
         when(httpClient.get(eq("http://server2:8080"), any()))

@@ -1,5 +1,6 @@
 package com.example.proxy;
 
+import com.example.circuitbreaker.CircuitBreaker;
 import com.example.client.HttpClient;
 import com.example.client.HttpClientException;
 import com.example.health.HealthChecker;
@@ -31,6 +32,9 @@ public class ProxyResource {
 
     @Inject
     HealthChecker healthChecker;
+
+    @Inject
+    CircuitBreaker circuitBreaker;
 
     private static final Logger LOG = Logger.getLogger(ProxyResource.class);
 
@@ -80,6 +84,7 @@ public class ProxyResource {
 
     /**
      * Создает карту headers
+     *
      * @return Map<String, String>
      */
     private Map<String, String> createHeaders(HttpHeaders headers, HttpServerRequest request) {
@@ -99,63 +104,49 @@ public class ProxyResource {
     private Response executeWithRetry(String method, String path, Map<String, String> headers,
                                       HttpOperation operation) {
         long start = System.currentTimeMillis();
-        String url;
-        try {
-            url = loadBalancer.selectServer();
-        } catch (HttpClientException e) {
-            long duration = System.currentTimeMillis() - start;
-            LOG.errorf("<-- %s %s [FAILED: No available servers] %dms", method, path, duration);
-            return Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                    .entity("No available servers")
-                    .build();
-        }
-
-        LOG.infof("--> %s %s -> %s", method, path, url);
 
         Set<String> triedServers = new HashSet<>();
-        triedServers.add(url);
-
-        // Первая попытка
-        try {
-            com.example.client.HttpResponse response = operation.execute(url + path, headers);
-            long duration = System.currentTimeMillis() - start;
-            LOG.infof("<-- %s %s -> %s [%d] %dms", method, path, url, response.getStatusCode(), duration);
-            Response.ResponseBuilder builder = Response.status(response.getStatusCode());
-            response.getHeaders().forEach(builder::header);
-            return builder.entity(response.getBody()).build();
-        } catch (HttpClientException e) {
-            LOG.warnf("    %s %s -> %s [FAILED: %s] retrying...", method, path, url, e.getMessage());
-            healthChecker.markUnhealthy(url);
-        }
-
-        // Retry на других серверах
         int maxAttempts = scheduledHealthCheckService.getCachedHealthyServers().size();
 
         for (int i = 0; i < maxAttempts; i++) {
-            String newUrl;
+            String url;
             try {
-                newUrl = loadBalancer.selectServer();
+                url = loadBalancer.selectServer();
             } catch (HttpClientException e) {
-                break;
+                break;  // Нет доступных серверов
             }
 
-            if (triedServers.contains(newUrl)) {
+            // Пропускаем уже опробованные
+            if (triedServers.contains(url)) {
                 continue;
             }
-            triedServers.add(newUrl);
+            triedServers.add(url);
 
-            LOG.infof("--> %s %s -> %s (retry)", method, path, newUrl);
+            // Circuit Breaker: пропускаем если circuit открыт
+            if (circuitBreaker.isOpen(url)) {
+                LOG.warnf("    %s %s -> %s [SKIPPED: Circuit Open]", method, path, url);
+                continue;
+            }
+
+            LOG.infof("--> %s %s -> %s", method, path, url);
 
             try {
-                com.example.client.HttpResponse response = operation.execute(newUrl + path, headers);
+                com.example.client.HttpResponse response = operation.execute(url + path, headers);
                 long duration = System.currentTimeMillis() - start;
-                LOG.infof("<-- %s %s -> %s [%d] %dms", method, path, newUrl, response.getStatusCode(), duration);
+                LOG.infof("<-- %s %s -> %s [%d] %dms", method, path, url, response.getStatusCode(), duration);
+
+                // Circuit Breaker: успех
+                circuitBreaker.recordSuccess(url);
+
                 Response.ResponseBuilder builder = Response.status(response.getStatusCode());
                 response.getHeaders().forEach(builder::header);
                 return builder.entity(response.getBody()).build();
             } catch (HttpClientException e) {
-                LOG.warnf("    %s %s -> %s [FAILED: %s] retrying...", method, path, newUrl, e.getMessage());
-                healthChecker.markUnhealthy(newUrl);
+                LOG.warnf("    %s %s -> %s [FAILED: %s] retrying...", method, path, url, e.getMessage());
+
+                // Circuit Breaker: ошибка
+                circuitBreaker.recordFailure(url);
+                healthChecker.markUnhealthy(url);
             }
         }
 
