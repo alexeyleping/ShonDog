@@ -4,9 +4,11 @@ import com.example.circuitbreaker.CircuitBreaker;
 import com.example.client.HttpClient;
 import com.example.client.HttpClientException;
 import com.example.client.HttpResponse;
+import com.example.config.AppConfig;
 import com.example.health.HealthChecker;
 import com.example.health.impl.ScheduledHealthCheckService;
 import com.example.loadbalancer.LoadBalancer;
+import com.example.ratelimiter.RateLimiter;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.vertx.core.http.HttpServerRequest;
@@ -45,6 +47,9 @@ class ProxyResourceRetryTest {
     @InjectMock
     CircuitBreaker circuitBreaker;
 
+    @InjectMock
+    RateLimiter rateLimiter;
+
     @Inject
     ProxyResource proxyResource;
 
@@ -53,7 +58,7 @@ class ProxyResourceRetryTest {
 
     @BeforeEach
     void setUp() throws HttpClientException {
-        Mockito.reset(httpClient, loadBalancer, scheduledHealthCheckService, healthChecker, circuitBreaker);
+        Mockito.reset(httpClient, loadBalancer, scheduledHealthCheckService, healthChecker, circuitBreaker, rateLimiter);
 
         // Mock HttpHeaders
         mockHeaders = mock(HttpHeaders.class);
@@ -67,6 +72,11 @@ class ProxyResourceRetryTest {
 
         // Mock CircuitBreaker - по умолчанию circuit закрыт
         when(circuitBreaker.isOpen(anyString())).thenReturn(false);
+
+        // Mock RateLimiter - всегда разрешаем запросы в тестах
+        when(rateLimiter.allowRequest(anyString())).thenReturn(true);
+        when(rateLimiter.getRemaining(anyString())).thenReturn(60);
+        when(rateLimiter.getResetTime(anyString())).thenReturn(System.currentTimeMillis() / 1000);
     }
 
     @Test

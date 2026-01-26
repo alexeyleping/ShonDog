@@ -16,6 +16,16 @@ public interface AppConfig {
 
     CircuitBreaker circuitBreaker();
 
+    RateLimit rateLimit();
+
+    interface RateLimit {
+        @WithDefault("60")
+        int requestsPerMinute();
+
+        @WithDefault("true")
+        boolean enabled();
+    }
+
     interface CircuitBreaker {
         @WithDefault("3")
         int failureThreshold();

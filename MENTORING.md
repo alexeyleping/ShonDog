@@ -228,6 +228,34 @@
 - `@PostConstruct` для инициализации полей после DI (повторение)
 - Важность использования латинских символов в коде (кириллическая 'с' vs латинская 'c')
 
+### Задание #14 - Rate Limiting ✅
+**Статус**: Завершено
+**Файлы**:
+- Создан `com.example.ratelimiter.RateLimiter` - интерфейс rate limiter с методами `allowRequest()`, `getRemaining()`, `getResetTime()`
+- Создан `com.example.ratelimiter.impl.TokenBucketRateLimiter` - реализация алгоритма Token Bucket
+- Обновлён `com.example.config.AppConfig` - добавлена конфигурация `RateLimit` с `requestsPerMinute()` и `enabled()`
+- Обновлён `com.example.proxy.ProxyResource` - добавлены методы `checkRateLimit()` и `addRateLimitHeaders()`, интеграция во все HTTP методы
+- Добавлен `com.example.ratelimiter.impl.TokenBucketRateLimiterTest` - unit-тесты для rate limiter (13 тестов)
+- Обновлён `ProxyResourceRetryTest` - добавлен мок для RateLimiter
+- Обновлён `application.properties` - настройки `app.rate-limit.requests-per-minute=60` и `app.rate-limit.enabled=true`
+- Обновлён `test/application.properties` - отключён rate limiting в тестах (`enabled=false`)
+**Чему научились**:
+- Паттерн Rate Limiting — защита от перегрузки и DDoS атак
+- Алгоритм Token Bucket — пополнение токенов с постоянной скоростью, позволяет кратковременные всплески
+- HTTP статус код `429 Too Many Requests` для превышения лимита
+- Стандартные заголовки rate limiting:
+  - `X-RateLimit-Limit` — максимум запросов в минуту
+  - `X-RateLimit-Remaining` — осталось доступных запросов
+  - `X-RateLimit-Reset` — Unix timestamp когда лимит сбросится
+  - `Retry-After` — через сколько секунд можно повторить запрос
+- Идентификация клиента по IP адресу (`request.remoteAddress().host()`)
+- `Math.floor()` для округления вниз (токены → целое число)
+- `Math.ceil()` для округления вверх (секунды до пополнения)
+- `Instant.now().getEpochSecond()` для получения Unix timestamp в секундах
+- `Response.fromResponse()` для создания нового Response на основе существующего
+- Конфигурация с возможностью включения/выключения фичи (`enabled` флаг)
+- Отдельная конфигурация для тестов (`src/test/resources/application.properties`)
+
 ---
 
 ## Структура пакетов
@@ -256,6 +284,10 @@ com.example
 │   ├── LoadBalancer.java
 │   └── impl
 │       └── RoundRobinLoadBalancer.java
+├── ratelimiter             # Rate Limiting
+│   ├── RateLimiter.java
+│   └── impl
+│       └── TokenBucketRateLimiter.java
 └── proxy                   # REST endpoints
     └── ProxyResource.java
 ```
@@ -264,5 +296,5 @@ com.example
 
 ## Текущий статус
 - **Фаза**: Разработка core компонентов
-- **Последнее задание**: #13 - Circuit Breaker ✅
+- **Последнее задание**: #14 - Rate Limiting ✅
 - **Следующий шаг**: TBD

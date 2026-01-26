@@ -3,9 +3,11 @@ package com.example.proxy;
 import com.example.circuitbreaker.CircuitBreaker;
 import com.example.client.HttpClient;
 import com.example.client.HttpClientException;
+import com.example.config.AppConfig;
 import com.example.health.HealthChecker;
 import com.example.health.impl.ScheduledHealthCheckService;
 import com.example.loadbalancer.LoadBalancer;
+import com.example.ratelimiter.RateLimiter;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Context;
@@ -36,6 +38,12 @@ public class ProxyResource {
     @Inject
     CircuitBreaker circuitBreaker;
 
+    @Inject
+    RateLimiter rateLimiter;
+
+    @Inject
+    AppConfig config;
+
     private static final Logger LOG = Logger.getLogger(ProxyResource.class);
 
     /**
@@ -45,8 +53,17 @@ public class ProxyResource {
     @Produces(MediaType.TEXT_PLAIN)
     public Response proxyGet(@QueryParam("path") @DefaultValue("") String path, @Context HttpHeaders headers,
                              @Context HttpServerRequest request) {
+        String clientIp = request.remoteAddress().host();
+
+        // Проверка rate limit
+        Response rateLimitResponse = checkRateLimit(clientIp);
+        if (rateLimitResponse != null) {
+            return rateLimitResponse;
+        }
+
         Map<String, String> headersMap = createHeaders(headers, request);
-        return executeWithRetry("GET", path, headersMap, (url, h) -> httpClient.get(url, h));
+        Response response = executeWithRetry("GET", path, headersMap, (url, h) -> httpClient.get(url, h));
+        return addRateLimitHeaders(response, clientIp);
     }
 
     /**
@@ -56,8 +73,17 @@ public class ProxyResource {
     @Produces(MediaType.TEXT_PLAIN)
     public Response proxyPost(@QueryParam("path") @DefaultValue("") String path, String body, @Context HttpHeaders headers,
                               @Context HttpServerRequest request) {
+        String clientIp = request.remoteAddress().host();
+
+        // Проверка rate limit
+        Response rateLimitResponse = checkRateLimit(clientIp);
+        if (rateLimitResponse != null) {
+            return rateLimitResponse;
+        }
+
         Map<String, String> headersMap = createHeaders(headers, request);
-        return executeWithRetry("POST", path, headersMap, (url, h) -> httpClient.post(url, body, h));
+        Response response = executeWithRetry("POST", path, headersMap, (url, h) -> httpClient.post(url, body, h));
+        return addRateLimitHeaders(response, clientIp);
     }
 
     /**
@@ -67,8 +93,17 @@ public class ProxyResource {
     @Produces(MediaType.TEXT_PLAIN)
     public Response proxyPut(@QueryParam("path") @DefaultValue("") String path, String body, @Context HttpHeaders headers,
                              @Context HttpServerRequest request) {
+        String clientIp = request.remoteAddress().host();
+
+        // Проверка rate limit
+        Response rateLimitResponse = checkRateLimit(clientIp);
+        if (rateLimitResponse != null) {
+            return rateLimitResponse;
+        }
+
         Map<String, String> headersMap = createHeaders(headers, request);
-        return executeWithRetry("PUT", path, headersMap, (url, h) -> httpClient.put(url, body, h));
+        Response response = executeWithRetry("PUT", path, headersMap, (url, h) -> httpClient.put(url, body, h));
+        return addRateLimitHeaders(response, clientIp);
     }
 
     /**
@@ -78,8 +113,64 @@ public class ProxyResource {
     @Produces(MediaType.TEXT_PLAIN)
     public Response proxyDelete(@QueryParam("path") @DefaultValue("") String path, @Context HttpHeaders headers,
                                 @Context HttpServerRequest request) {
+        String clientIp = request.remoteAddress().host();
+
+        // Проверка rate limit
+        Response rateLimitResponse = checkRateLimit(clientIp);
+        if (rateLimitResponse != null) {
+            return rateLimitResponse;
+        }
+
         Map<String, String> headersMap = createHeaders(headers, request);
-        return executeWithRetry("DELETE", path, headersMap, (url, h) -> httpClient.delete(url, h));
+        Response response = executeWithRetry("DELETE", path, headersMap, (url, h) -> httpClient.delete(url, h));
+        return addRateLimitHeaders(response, clientIp);
+    }
+
+    /**
+     * Проверяет rate limit для клиента
+     * @param clientIp IP адрес клиента
+     * @return Response с кодом 429 если лимит превышен, иначе null
+     */
+    private Response checkRateLimit(String clientIp) {
+        if (!config.rateLimit().enabled()) {
+            return null;
+        }
+
+        if (!rateLimiter.allowRequest(clientIp)) {
+            LOG.warnf("Rate limit exceeded for client: %s", clientIp);
+
+            long resetTime = rateLimiter.getResetTime(clientIp);
+            long retryAfter = resetTime - (System.currentTimeMillis() / 1000);
+
+            return Response.status(Response.Status.TOO_MANY_REQUESTS)
+                    .header("X-RateLimit-Limit", config.rateLimit().requestsPerMinute())
+                    .header("X-RateLimit-Remaining", "0")
+                    .header("X-RateLimit-Reset", resetTime)
+                    .header("Retry-After", Math.max(1, retryAfter))
+                    .entity("Rate limit exceeded. Please try again later.")
+                    .build();
+        }
+
+        return null;
+    }
+
+    /**
+     * Добавляет заголовки rate limit в ответ
+     * @param response оригинальный ответ
+     * @param clientIp IP адрес клиента
+     * @return ответ с добавленными заголовками
+     */
+    private Response addRateLimitHeaders(Response response, String clientIp) {
+        if (!config.rateLimit().enabled()) {
+            return response;
+        }
+
+        Response.ResponseBuilder builder = Response.fromResponse(response);
+        builder.header("X-RateLimit-Limit", config.rateLimit().requestsPerMinute());
+        builder.header("X-RateLimit-Remaining", rateLimiter.getRemaining(clientIp));
+        builder.header("X-RateLimit-Reset", rateLimiter.getResetTime(clientIp));
+
+        return builder.build();
     }
 
     /**
@@ -161,4 +252,5 @@ public class ProxyResource {
     interface HttpOperation {
         com.example.client.HttpResponse execute(String url, Map<String, String> headers) throws HttpClientException;
     }
+
 }
