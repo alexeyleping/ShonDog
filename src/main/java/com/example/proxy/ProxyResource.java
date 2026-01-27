@@ -1,5 +1,7 @@
 package com.example.proxy;
 
+import com.example.cache.CachedResponse;
+import com.example.cache.ResponseCache;
 import com.example.circuitbreaker.CircuitBreaker;
 import com.example.client.HttpClient;
 import com.example.client.HttpClientException;
@@ -18,6 +20,8 @@ import io.vertx.core.http.HttpServerRequest;
 import jakarta.ws.rs.core.Response;
 import org.jboss.logging.Logger;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 
 @Path("/proxy")
@@ -42,6 +46,9 @@ public class ProxyResource {
     RateLimiter rateLimiter;
 
     @Inject
+    ResponseCache responseCache;
+
+    @Inject
     AppConfig config;
 
     private static final Logger LOG = Logger.getLogger(ProxyResource.class);
@@ -61,8 +68,25 @@ public class ProxyResource {
             return rateLimitResponse;
         }
 
+        // Проверяем кеш для GET-запросов
+        if (config.cache().enabled()) {
+            Optional<CachedResponse> cached = responseCache.get(path);
+            if (cached.isPresent()) {
+                LOG.infof("<-- GET %s [CACHE HIT]", path);
+                Response response = buildCachedResponse(cached.get());
+                return addRateLimitHeaders(response, clientIp);
+            }
+        }
+
         Map<String, String> headersMap = createHeaders(headers, request);
         Response response = executeWithRetry("GET", path, headersMap, (url, h) -> httpClient.get(url, h));
+
+        // Сохраняем успешный ответ в кеш
+        if (config.cache().enabled() && response.getStatus() >= 200 && response.getStatus() < 300) {
+            cacheResponse(path, response);
+        }
+
+        response = addCacheHeader(response, "MISS");
         return addRateLimitHeaders(response, clientIp);
     }
 
@@ -79,6 +103,11 @@ public class ProxyResource {
         Response rateLimitResponse = checkRateLimit(clientIp);
         if (rateLimitResponse != null) {
             return rateLimitResponse;
+        }
+
+        // Инвалидация кеша — данные изменились
+        if (config.cache().enabled()) {
+            responseCache.evict(path);
         }
 
         Map<String, String> headersMap = createHeaders(headers, request);
@@ -101,6 +130,11 @@ public class ProxyResource {
             return rateLimitResponse;
         }
 
+        // Инвалидация кеша — данные изменились
+        if (config.cache().enabled()) {
+            responseCache.evict(path);
+        }
+
         Map<String, String> headersMap = createHeaders(headers, request);
         Response response = executeWithRetry("PUT", path, headersMap, (url, h) -> httpClient.put(url, body, h));
         return addRateLimitHeaders(response, clientIp);
@@ -119,6 +153,11 @@ public class ProxyResource {
         Response rateLimitResponse = checkRateLimit(clientIp);
         if (rateLimitResponse != null) {
             return rateLimitResponse;
+        }
+
+        // Инвалидация кеша — данные изменились
+        if (config.cache().enabled()) {
+            responseCache.evict(path);
         }
 
         Map<String, String> headersMap = createHeaders(headers, request);
@@ -246,6 +285,47 @@ public class ProxyResource {
         return Response.status(Response.Status.SERVICE_UNAVAILABLE)
                 .entity("All backend servers are unavailable")
                 .build();
+    }
+
+    /**
+     * Строит Response из кешированного ответа с заголовками X-Cache: HIT и Age
+     */
+    private Response buildCachedResponse(CachedResponse cached) {
+        Response.ResponseBuilder builder = Response.status(cached.getStatusCode());
+        cached.getHeaders().forEach(builder::header);
+        long ageSeconds = Duration.between(cached.getCachedAt(), Instant.now()).getSeconds();
+        builder.header("X-Cache", "HIT");
+        builder.header("Age", ageSeconds);
+        return builder.entity(cached.getBody()).build();
+    }
+
+    /**
+     * Сохраняет ответ в кеш
+     */
+    private void cacheResponse(String path, Response response) {
+        CachedResponse cached = new CachedResponse();
+        cached.setBody((String) response.getEntity());
+        cached.setStatusCode(response.getStatus());
+        Map<String, String> headers = new HashMap<>();
+        response.getHeaders().forEach((key, values) -> {
+            if (values != null && !values.isEmpty()) {
+                headers.put(key, values.get(0).toString());
+            }
+        });
+        cached.setHeaders(headers);
+        responseCache.put(path, cached);
+    }
+
+    /**
+     * Добавляет заголовок X-Cache в ответ
+     */
+    private Response addCacheHeader(Response response, String value) {
+        if (!config.cache().enabled()) {
+            return response;
+        }
+        Response.ResponseBuilder builder = Response.fromResponse(response);
+        builder.header("X-Cache", value);
+        return builder.build();
     }
 
     @FunctionalInterface

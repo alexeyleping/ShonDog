@@ -1,5 +1,6 @@
 package com.example.proxy;
 
+import com.example.cache.ResponseCache;
 import com.example.circuitbreaker.CircuitBreaker;
 import com.example.client.HttpClient;
 import com.example.client.HttpClientException;
@@ -50,6 +51,9 @@ class ProxyResourceRetryTest {
     @InjectMock
     RateLimiter rateLimiter;
 
+    @InjectMock
+    ResponseCache responseCache;
+
     @Inject
     ProxyResource proxyResource;
 
@@ -58,7 +62,7 @@ class ProxyResourceRetryTest {
 
     @BeforeEach
     void setUp() throws HttpClientException {
-        Mockito.reset(httpClient, loadBalancer, scheduledHealthCheckService, healthChecker, circuitBreaker, rateLimiter);
+        Mockito.reset(httpClient, loadBalancer, scheduledHealthCheckService, healthChecker, circuitBreaker, rateLimiter, responseCache);
 
         // Mock HttpHeaders
         mockHeaders = mock(HttpHeaders.class);

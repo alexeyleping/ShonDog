@@ -256,12 +256,40 @@
 - Конфигурация с возможностью включения/выключения фичи (`enabled` флаг)
 - Отдельная конфигурация для тестов (`src/test/resources/application.properties`)
 
+### Задание #15 - Response Caching (Кеширование ответов) ✅
+**Статус**: Завершено
+**Файлы**:
+- Создан `com.example.cache.ResponseCache` - интерфейс кеша с методами `get`, `put`, `evict`, `clear`
+- Создан `com.example.cache.CachedResponse` - класс для хранения кешированного ответа (body, statusCode, headers, cachedAt)
+- Создан `com.example.cache.impl.InMemoryResponseCache` - реализация in-memory кеша с TTL и max-size
+- Обновлён `com.example.config.AppConfig` - исправлен интерфейс `Cache` (методы вместо полей, `Duration` для TTL)
+- Обновлён `com.example.proxy.ProxyResource` - интеграция кеша: GET кешируется, POST/PUT/DELETE инвалидируют кеш
+- Добавлен `com.example.cache.impl.InMemoryResponseCacheTest` - unit-тесты для кеша (10 тестов)
+- Обновлён `ProxyResourceRetryTest` - добавлен мок для ResponseCache
+- Обновлён `application.properties` - настройки `app.cache.ttl=60s`, `app.cache.max-size=100`, `app.cache.enabled=true`
+- Обновлён `test/application.properties` - настройки кеша для тестов
+**Чему научились**:
+- Response Caching — снижение нагрузки на backend за счёт кеширования GET-ответов
+- TTL (Time To Live) — автоматическое устаревание записей по времени
+- `Duration.between()` для проверки возраста кешированной записи
+- Cache Invalidation — POST/PUT/DELETE инвалидируют кеш для изменённого ресурса
+- Стратегия вытеснения (eviction) — при переполнении удаляется самая старая запись
+- Заголовки `X-Cache: HIT/MISS` и `Age` — стандартный способ сообщить клиенту о кешировании
+- `Optional<T>` для безопасного возврата значений из кеша
+- `@ConfigMapping` — правильный синтаксис: методы (не поля) в интерфейсе конфигурации
+- `@PostConstruct` для инициализации конфигурационных значений после DI
+
 ---
 
 ## Структура пакетов
 
 ```
 com.example
+├── cache                   # Response Caching
+│   ├── ResponseCache.java
+│   ├── CachedResponse.java
+│   └── impl
+│       └── InMemoryResponseCache.java
 ├── circuitbreaker          # Circuit Breaker
 │   ├── CircuitBreaker.java
 │   ├── CircuitState.java
@@ -296,5 +324,5 @@ com.example
 
 ## Текущий статус
 - **Фаза**: Разработка core компонентов
-- **Последнее задание**: #14 - Rate Limiting ✅
+- **Последнее задание**: #15 - Response Caching ✅
 - **Следующий шаг**: TBD

@@ -18,6 +18,19 @@ public interface AppConfig {
 
     RateLimit rateLimit();
 
+    Cache cache();
+
+    interface Cache {
+        @WithDefault("60s")
+        Duration ttl();
+
+        @WithDefault("100")
+        int maxSize();
+
+        @WithDefault("true")
+        boolean enabled();
+    }
+
     interface RateLimit {
         @WithDefault("60")
         int requestsPerMinute();
